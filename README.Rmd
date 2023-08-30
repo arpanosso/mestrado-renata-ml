@@ -33,10 +33,10 @@ files_eu[1]
 ## Mapas Eucalipto
 
 ```{r}
-# for(i in seq(files_eu)){
-#   mp<-read.table(files_eu[i],skip = 5)
-#   image(mp %>%  as.matrix(),xlab = files_eu[i])
-# }
+for(i in seq(files_eu)){
+  mp<-read.table(files_eu[i],skip = 5)
+  image(mp %>%  as.matrix(),xlab = files_eu[i])
+}
 ```
 
 ## Mapas Silvipastoril
