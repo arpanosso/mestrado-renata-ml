@@ -2,15 +2,6 @@
 output: github_document
 ---
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
-```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>"
-)
-```
-
 # mestrado-renata-ml
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
@@ -26,7 +17,6 @@ knitr::opts_chunk$set(
 library(tidyverse)
 files_eu <- list.files("data/EU espacial/",full.names = TRUE)
 files_sp <- list.files("data/SP espacial/",full.names = TRUE)
-files_eu[1]
 ```
 
 ```{r}
