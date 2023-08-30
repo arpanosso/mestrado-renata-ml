@@ -42,8 +42,8 @@ for(i in seq(files_eu)){
 ## Mapas Silvipastoril
 
 ```{r}
-# for(i in seq(files_sp)){
-#   mp<-read.table(files_sp[i],skip = 5)
-#   image(mp %>%  as.matrix(),xlab = files_sp[i])
-# }
+for(i in seq(files_sp)){
+  mp<-read.table(files_sp[i],skip = 5)
+  image(mp %>%  as.matrix(),xlab = files_sp[i])
+}
 ```
