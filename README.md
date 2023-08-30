@@ -2,7 +2,18 @@
 # mestrado-renata-ml
 
 ``` r
+library(readxl)
 library(tidyverse)
+library(geobr)
+library(skimr)
+library(tidymodels)
+library(ISLR)
+library(modeldata)
+library(vip)
+library(ggpubr)
+```
+
+``` r
 files_eu <- list.files("data/EU espacial/",full.names = TRUE)
 files_sp <- list.files("data/SP espacial/",full.names = TRUE)
 ```
@@ -12,28 +23,170 @@ grd_read <- function(arq){
   nome <- str_split(arq, "/", simplify = TRUE)[3] %>%  str_remove(".grd")
   dados <- read.table(arq, skip = 5) %>% as.tibble()
   vetor <- as.vector(as.matrix(dados))
-  data.frame(nome,vetor)
+  id <- 1:length(vetor)
+  data.frame(id,nome,vetor)
 }
 eu <- map_df(files_eu,grd_read)
-eu$nome %>% unique() %>% sort()
-#>  [1] "Al_EU"     "Ca_EU"     "Ds_EU"     "EstC_EU"   "F03062017" "F10062017"
-#>  [7] "F15032017" "F17022017" "F17062017" "H-Al_EU"   "HLIFS_EU"  "K_EU"     
-#> [13] "Macro_EU"  "Mg_EU"     "Micro_EU"  "P_EU"      "pH_EU"     "SB_EU"    
-#> [19] "T03062017" "T10062017" "T15032017" "T17022017" "T17062017" "U03062017"
-#> [25] "U10062017" "U15032017" "U17022017" "U17062017"
+
+temporal_eu <- eu %>% 
+  filter(str_detect(nome,"^[F|U|T]")) %>% 
+  mutate(numero = as.numeric(str_remove(nome,"F|T|U")),
+         ano = numero %% 10000,
+         mes = numero %% 1000000 %/% 10000,
+         dia = numero %/% 1e6,
+         nome = str_remove_all(nome,"[0-9]")) %>% 
+  pivot_wider(names_from = nome, 
+              values_from = vetor)
+
+spatial_eu <- eu %>% 
+  filter(!str_detect(nome,"^[F|U|T]")) %>% 
+  mutate(nome = str_remove(nome,"_EU")) %>% 
+  pivot_wider(names_from = nome, 
+              values_from = vetor)
+
+data_eu <- left_join(temporal_eu, spatial_eu, by="id") %>% 
+  select(-numero) %>% 
+  mutate(data = make_date(year= ano, month=mes, day=dia)) %>% 
+  relocate(id,data)
 ```
 
 ``` r
 sp <- map_df(files_sp,grd_read)
-sp$nome %>% unique() %>% sort()
-#>  [1] "Al_SP"     "Ca_SP"     "Ds_SP"     "EstC_SP"   "F03022017" "F03032017"
-#>  [7] "F03062017" "F08032017" "F09022017" "F10062017" "F17032017" "F17062017"
-#> [13] "F22022017" "H_Al_SP"   "HLIFS_SP"  "K_SP"      "Macro_SP"  "Mg_SP"    
-#> [19] "Micro_SP"  "P_SP"      "pH_SP"     "SB_SP"     "T03022017" "T03032017"
-#> [25] "T03062017" "T08032017" "T09022017" "T10062017" "T17032017" "T17062017"
-#> [31] "T22022017" "U03022017" "U03032017" "U03062017" "U08032017" "U09022017"
-#> [37] "U10062017" "U17032017" "U17062017" "U22022017"
+
+temporal_sp <- sp %>% 
+  filter(str_detect(nome,"^[F|U|T]")) %>% 
+  mutate(numero = as.numeric(str_remove(nome,"F|T|U")),
+         ano = numero %% 10000,
+         mes = numero %% 1000000 %/% 10000,
+         dia = numero %/% 1e6,
+         nome = str_remove_all(nome,"[0-9]")) %>% 
+  pivot_wider(names_from = nome, 
+              values_from = vetor)
+
+
+spatial_sp <- sp %>% 
+  filter(!str_detect(nome,"^[F|U|T]")) %>% 
+  mutate(nome = str_remove(nome,"_SP")) %>% 
+  pivot_wider(names_from = nome, 
+              values_from = vetor)
+
+data_sp <- left_join(temporal_sp, spatial_sp, by="id") %>% 
+  select(-numero) %>% 
+  mutate(data = make_date(year= ano, month=mes, day=dia)) %>% 
+  relocate(id,data)
+
+names(data_eu) == names(data_sp)
+#>  [1] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
+#> [16] TRUE TRUE TRUE TRUE TRUE TRUE
+
+data_set <- rbind(data_eu %>% 
+                    mutate(local="EU"),
+                  data_sp %>% 
+                    mutate(local="SP")) %>% 
+  relocate(local)
 ```
+
+## Aprendizado de Máquina
+
+``` r
+# Definindo a base de treino e a base de teste
+locais <- data_set$local %>% unique()
+```
+
+``` r
+for(i in seq_along(locais)){
+  lo <- locais[i]
+  data <- data_set %>% filter(local == lo)
+  dias <- data$data %>% unique() 
+  for(j in seq_along(dias)){
+    di <- dias[j]
+    df <- data %>% filter(data == di)
+    fco2_initial_split <- initial_split(df %>% sample_n(300) 
+                                        , prop = 0.75)
+    fco2_train <- training(fco2_initial_split)
+    fco2_resamples_rf <- vfold_cv(fco2_train, v = 10)
+    
+    hist_fco2 <- fco2_train  %>% 
+      ggplot(aes(x=F, y=..density..))+
+      geom_histogram(bins = 30, color="black",  fill="lightgray")+
+      geom_density(alpha=.05,fill="red")+
+      theme_bw() +
+      labs(x="FCO2", y = "Densidade",title = paste(lo,di))
+    print(hist_fco2)
+    
+    fco2_train   %>%    select(-c(id,ano,mes,dia,local)) %>% 
+      select(where(is.numeric)) %>%
+      drop_na() %>% 
+      cor()  %>%  
+      corrplot::corrplot()
+    
+    fco2_recipe <- recipe(F ~ ., data = fco2_train %>% 
+                            select(-c(id,ano,mes,dia))) %>%  
+      step_novel(all_nominal_predictors()) %>% 
+      step_zv(all_predictors()) %>%
+      step_dummy(all_nominal_predictors())
+    bake(prep(fco2_recipe), new_data = NULL)
+    # visdat::vis_miss(bake(prep(fco2_recipe), new_data = NULL))
+    
+    fco2_resamples <- vfold_cv(fco2_train, v = 5) #<-------
+    grid <- grid_regular(
+      penalty(range = c(-8, 0)),
+      levels = 2 #<-------
+    )
+    
+    fco2_rf_model <- rand_forest(
+      min_n = tune(),
+      mtry = tune(),
+      trees = tune()
+    )   %>%  
+      set_mode("regression")  %>% 
+      set_engine("randomForest")
+    
+    fco2_rf_wf <- workflow()   %>%  
+      add_model(fco2_rf_model) %>%  
+      add_recipe(fco2_recipe)
+    
+    grid_rf <- grid_random(
+      min_n(range = c(20, 30)),
+      mtry(range = c(10, 20)),
+      trees(range = c(100, 300) ),
+      size = 5
+    )
+    fco2_rf_tune_grid <- tune_grid(
+      fco2_rf_wf,
+      resamples = fco2_resamples_rf,
+      grid = grid_rf,
+      metrics = metric_set(rmse)
+    ) 
+    print(autoplot(fco2_rf_tune_grid))
+    
+    fco2_rf_best_params <- select_best(fco2_rf_tune_grid, "rmse")
+    fco2_rf_wf <- fco2_rf_wf %>% finalize_workflow(fco2_rf_best_params)
+    fco2_rf_last_fit <- last_fit(fco2_rf_wf, fco2_initial_split)
+    
+    fco2_test_preds <- bind_rows(
+      collect_predictions(fco2_rf_last_fit)  %>%   mutate(modelo = "rf")
+    )
+    pre_obs_plot <- fco2_test_preds %>% 
+      ggplot(aes(x=.pred, y=F)) +
+      geom_point()+
+      theme_bw() +
+      geom_smooth(method = "lm") +
+      stat_regline_equation(ggplot2::aes(
+        label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))+
+      labs(title = paste(lo,di))
+    print(pre_obs_plot)
+    
+    fco2_rf_last_fit_model <- fco2_rf_last_fit$.workflow[[1]]$fit$fit
+    vip_plot <- vip(fco2_rf_last_fit_model,
+        aesthetics = list(color = "grey35", size = 0.8, fill="orange")) +
+      theme_bw()
+    print(vip_plot)
+  }
+}
+```
+
+![](README_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-5.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-6.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-7.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-8.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-9.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-10.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-11.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-12.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-13.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-14.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-15.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-16.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-17.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-18.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-19.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-20.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-21.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-22.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-23.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-24.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-25.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-26.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-27.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-28.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-29.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-30.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-31.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-32.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-33.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-34.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-35.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-36.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-37.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-38.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-39.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-40.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-41.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-42.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-43.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-44.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-45.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-46.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-47.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-48.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-49.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-50.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-51.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-52.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-53.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-54.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-55.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-56.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-57.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-58.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-59.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-60.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-61.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-62.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-63.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-64.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-65.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-66.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-67.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-68.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-69.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-7-70.png)<!-- -->
 
 ## Mapas Eucalipto
 
@@ -44,7 +197,7 @@ for(i in seq(files_eu)){
 }
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-5.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-6.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-7.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-8.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-9.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-10.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-11.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-12.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-13.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-14.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-15.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-16.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-17.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-18.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-19.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-20.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-21.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-22.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-23.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-24.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-25.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-26.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-27.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-5-28.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-5.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-6.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-7.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-8.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-9.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-10.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-11.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-12.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-13.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-14.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-15.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-16.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-17.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-18.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-19.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-20.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-21.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-22.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-23.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-24.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-25.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-26.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-27.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-8-28.png)<!-- -->
 
 ## Mapas Silvipastoril
 
@@ -55,4 +208,4 @@ for(i in seq(files_sp)){
 }
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-5.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-6.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-7.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-8.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-9.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-10.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-11.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-12.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-13.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-14.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-15.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-16.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-17.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-18.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-19.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-20.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-21.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-22.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-23.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-24.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-25.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-26.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-27.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-28.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-29.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-30.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-31.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-32.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-33.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-34.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-35.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-36.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-37.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-38.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-39.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-6-40.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-3.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-4.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-5.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-6.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-7.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-8.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-9.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-10.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-11.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-12.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-13.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-14.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-15.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-16.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-17.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-18.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-19.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-20.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-21.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-22.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-23.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-24.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-25.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-26.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-27.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-28.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-29.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-30.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-31.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-32.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-33.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-34.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-35.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-36.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-37.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-38.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-39.png)<!-- -->![](README_files/figure-gfm/unnamed-chunk-9-40.png)<!-- -->
