@@ -29,6 +29,22 @@ files_sp <- list.files("data/SP espacial/",full.names = TRUE)
 files_eu[1]
 ```
 
+```{r}
+grd_read <- function(arq){
+  nome <- str_split(arq, "/", simplify = TRUE)[3] %>%  str_remove(".grd")
+  dados <- read.table(arq, skip = 5) %>% as.tibble()
+  vetor <- as.vector(as.matrix(dados))
+  data.frame(nome,vetor)
+}
+eu <- map_df(files_eu,grd_read)
+eu$nome %>% unique() %>% sort()
+```
+
+
+```{r}
+sp <- map_df(files_sp,grd_read)
+sp$nome %>% unique() %>% sort()
+```
 
 ## Mapas Eucalipto
 
