@@ -113,7 +113,7 @@ for(i in seq_along(locais)){
   for(j in seq_along(dias)){
     di <- dias[j]
     df <- data %>% filter(data == di)
-    fco2_initial_split <- initial_split(df %>% sample_n(300) 
+    fco2_initial_split <- initial_split(df  %>% sample_n(trunc(nrow(df)*.65)) 
                                         , prop = 0.75)
     fco2_train <- training(fco2_initial_split)
     fco2_resamples_rf <- vfold_cv(fco2_train, v = 10)
@@ -143,7 +143,7 @@ for(i in seq_along(locais)){
     fco2_resamples <- vfold_cv(fco2_train, v = 5) #<-------
     grid <- grid_regular(
       penalty(range = c(-8, 0)),
-      levels = 2 #<-------
+      levels = 10 #<-------
     )
     
     fco2_rf_model <- rand_forest(
@@ -162,7 +162,7 @@ for(i in seq_along(locais)){
       min_n(range = c(20, 30)),
       mtry(range = c(10, 20)),
       trees(range = c(100, 300) ),
-      size = 5
+      size = 20
     )
     fco2_rf_tune_grid <- tune_grid(
       fco2_rf_wf,
