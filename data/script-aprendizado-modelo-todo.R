@@ -73,7 +73,7 @@ library(ggpubr)
 #                     mutate(local="SP")) %>%
 #   relocate(local)
 # writexl::write_xlsx(data_set,"data/dados-krg-total.xlsx")
-data_set <- readxl::read_excel("data/dados-krg-total.xlsx") %>% sample_n(100)
+data_set <- readxl::read_excel("data/dados-krg-total.xlsx") #%>% sample_n(100)
 glimpse(data_set)
 
 fco2_initial_split <- initial_split(data_set  %>%
