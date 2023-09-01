@@ -7,7 +7,7 @@ library(ISLR)
 library(modeldata)
 library(vip)
 library(ggpubr)
-#
+
 # files_eu <- list.files("data/EU espacial/",full.names = TRUE)
 # files_sp <- list.files("data/SP espacial/",full.names = TRUE)
 #
@@ -73,12 +73,13 @@ library(ggpubr)
 #                     mutate(local="SP")) %>%
 #   relocate(local)
 # writexl::write_xlsx(data_set,"data/dados-krg-total.xlsx")
-data_set <- readxl::read_excel("data/dados-krg-total.xlsx")
+data_set <- readxl::read_excel("data/dados-krg-total.xlsx") %>% sample_n(100)
 glimpse(data_set)
 
-fco2_initial_split <- initial_split(data_set %>% # sample_n(100) %>%
+fco2_initial_split <- initial_split(data_set  %>%
                                       select(-id),
                                     prop = 0.75)
+
 fco2_train <- training(fco2_initial_split)
 
 fco2_train  %>%
@@ -129,7 +130,7 @@ grid_rf <- grid_random(
 )
 fco2_rf_tune_grid <- tune_grid(
   fco2_rf_wf,
-  resamples = fco2_resamples_rf,
+  resamples = fco2_resamples,
   grid = grid_rf,
   metrics = metric_set(rmse)
 )
@@ -142,6 +143,7 @@ fco2_rf_last_fit <- last_fit(fco2_rf_wf, fco2_initial_split)
 fco2_test_preds <- bind_rows(
   collect_predictions(fco2_rf_last_fit)  %>%   mutate(modelo = "rf")
 )
+
 fco2_test_preds %>%
   ggplot(aes(x=.pred, y=F)) +
   geom_point()+
@@ -153,17 +155,13 @@ fco2_test_preds %>%
 
 fco2_rf_last_fit_model <- fco2_rf_last_fit$.workflow[[1]]$fit$fit
 vip(fco2_rf_last_fit_model,
-                aesthetics = list(color = "grey35", size = 0.8, fill="orange")) +
-  theme_bw()
+                 aesthetics =
+       list(color = "grey35", size = 0.8, fill="orange")) +
+   theme_bw()
 
 
-## salvando modelo final
-saveRDS(fco2_rf_last_fit, "data/fco2_rf_last_fit.rds")
+fco2_modelo_final <- fco2_rf_wf %>% fit(data_set)
 
-# predict(telco_modelo_final, new_data = telco_test, type="prob") %>%
-#   arrange(desc(.pred_Yes))
-#
-# table(
-#   predict(telco_modelo_final, new_data = telco_test, type="prob")$.pred_Yes > 0.5,
-#   telco_test$Churn
-# )
+saveRDS(fco2_modelo_final, "fco2_modelo_final.rds")
+fco2_modelo_final_load <- read_rds("fco2_modelo_final.rds")
+predict(fco2_modelo_final_load, new_data = data_set)
