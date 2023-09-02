@@ -1,4 +1,13 @@
+library(readxl)
 library(tidyverse)
+library(geobr)
+library(skimr)
+library(tidymodels)
+library(ISLR)
+library(modeldata)
+library(vip)
+library(ggpubr)
+
 files_validacao <- list.files("data/Validacao/",full.names = TRUE)
 
 grd_read <- function(arq){
@@ -29,14 +38,25 @@ data <- left_join(temporal, spatial, by="id") %>%
   mutate(data = make_date(year= ano, month=mes, day=dia),
          local = "EU") %>%
   relocate(id,data)
-data
-fco2_rf_last_fit <- read_rds("data/fco2_rf_last_fit.rds")
-# data$.pred <- predict(fco2_rf_last_fit, data)
-#
-# predict(fco2_rf_last_fit, new_data = data, type="prob") %>%
-#    arrange(desc(.pred_Yes))
-# #
-# table(
-#   predict(telco_modelo_final, new_data = telco_test, type="prob")$.pred_Yes > 0.5,
-#   telco_test$Churn
-# )
+fco2_modelo_final_load <- read_rds("fco2_modelo_final.rds")
+df <- predict(fco2_modelo_final_load, new_data = data %>%
+          select(-(id:F)))
+
+data$data %>% unique()
+cbind(df, data) %>%
+ filter(data=="2015-11-18") %>%
+  ggplot(aes(x=.pred, y=obs)) +
+  geom_point()+
+  theme_bw() +
+  geom_smooth(method = "lm") +
+  stat_regline_equation(ggplot2::aes(
+    label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))
+
+data$data %>% unique()
+cbind(df, data) %>%
+  filter(data=="2015-11-18") %>%
+  pull(.pred) %>% matrix(ncol=94) %>% image()
+
+cbind(df, data) %>%
+  filter(data=="2015-11-18") %>%
+  pull(F) %>% matrix(ncol=94) %>% image()
