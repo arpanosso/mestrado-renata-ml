@@ -34,29 +34,32 @@ spatial <- val %>%
   pivot_wider(names_from = nome,
               values_from = vetor)
 
-data <- left_join(temporal, spatial, by="id") %>%
+data_set <- left_join(temporal, spatial, by="id") %>%
   mutate(data = make_date(year= ano, month=mes, day=dia),
          local = "EU") %>%
   relocate(id,data)
-fco2_modelo_final_load <- read_rds("fco2_modelo_final.rds")
-df <- predict(fco2_modelo_final_load, new_data = data %>%
-          select(-(id:F)))
 
-data$data %>% unique()
-cbind(df, data) %>%
- filter(data=="2015-11-18") %>%
-  ggplot(aes(x=.pred, y=obs)) +
+
+file_models <- list.files("models", pattern = "EU")
+
+fco2_modelo_load <- read_rds(paste0("models/",file_models[1]))
+df <- predict(fco2_modelo_load, new_data = data_set %>%
+              filter(data == "2015-10-02"))
+
+cbind(df, data_set %>%
+        filter(data == "2015-11-18"))  %>%
+  ggplot(aes(x=.pred, y=F)) +
   geom_point()+
   theme_bw() +
   geom_smooth(method = "lm") +
   stat_regline_equation(ggplot2::aes(
     label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))
 
-data$data %>% unique()
-cbind(df, data) %>%
-  filter(data=="2015-11-18") %>%
+cbind(df, data_set %>%
+        filter(data == "2015-11-18")) %>%
   pull(.pred) %>% matrix(ncol=94) %>% image()
 
-cbind(df, data) %>%
-  filter(data=="2015-11-18") %>%
+cbind(df, data_set %>%
+        filter(data == "2015-11-18")) %>%
   pull(F) %>% matrix(ncol=94) %>% image()
+
