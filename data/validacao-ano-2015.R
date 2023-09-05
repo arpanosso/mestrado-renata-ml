@@ -87,7 +87,7 @@ for(i in seq_along(dias)){
     pred <- predict(fco2_modelo_load, new_data = df) %>% as.vector()
     preds <- cbind(preds,pred)
   }
-  preds$media_models <- apply(preds[,2:6],1,mean)
+  preds$media_models <- apply(preds[,2:6],1,median)
 
   plot_obs_vs_pred<-preds  %>% select(Fobs,media_models) %>%
     ggplot(aes(x=media_models, y=Fobs)) +
@@ -104,17 +104,52 @@ for(i in seq_along(dias)){
     scale_fill_viridis_c() +
     coord_equal()
 
-  mp_models <- tibble(grid, preds  %>% select(Fobs,media_models)) %>%
+  mp_media <- tibble(grid, preds  %>% select(Fobs,media_models)) %>%
     ggplot(aes(x=X,y=Y)) +
     geom_tile(aes(fill = media_models)) +
     scale_fill_viridis_c() +
     coord_equal()
 
+  names(preds) <- c("Fobs","model1","model2","model3",
+                    "model4","model5","media_models")
+
+  mp_model1 <- tibble(grid, preds) %>%
+    ggplot(aes(x=X,y=Y)) +
+    geom_tile(aes(fill = model1)) +
+    scale_fill_viridis_c() +
+    coord_equal()
+
+  mp_model2 <- tibble(grid, preds) %>%
+    ggplot(aes(x=X,y=Y)) +
+    geom_tile(aes(fill = model2)) +
+    scale_fill_viridis_c() +
+    coord_equal()
+
+  mp_model3 <- tibble(grid, preds) %>%
+    ggplot(aes(x=X,y=Y)) +
+    geom_tile(aes(fill = model3)) +
+    scale_fill_viridis_c() +
+    coord_equal()
+
+  mp_model4 <- tibble(grid, preds) %>%
+    ggplot(aes(x=X,y=Y)) +
+    geom_tile(aes(fill = model4)) +
+    scale_fill_viridis_c() +
+    coord_equal()
+
+  mp_model5 <- tibble(grid, preds) %>%
+    ggplot(aes(x=X,y=Y)) +
+    geom_tile(aes(fill = model5)) +
+    scale_fill_viridis_c() +
+    coord_equal()
+
+
+  print((mp_krg + mp_media)/ (mp_model1 + mp_model2 + mp_model3)/
+          (mp_model4 | mp_model5)
+        )
+
   vetor_x <- dados_reais$X
   vetor_y <- dados_reais$Y
-
-  print(mp_krg | mp_models)
-
   my_data_frame <- tibble(grid, preds  %>% select(Fobs,media_models))
 
   dia_teste <- paste0("F",
