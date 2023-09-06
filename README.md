@@ -143,7 +143,7 @@ for(i in seq_along(locais)){
   for(j in seq_along(dias)){
     di <- dias[j]
     df <- data %>% filter(data == di)
-    fco2_initial_split <- initial_split(df  %>%                                          select(-c(id,ano,mes,dia,local)) %>%                                           sample_n(trunc(nrow(df)*.75)), prop = 0.75)
+    fco2_initial_split <- initial_split(df  %>%                                          select(-c(id,ano,mes,dia,local)) %>%                                           sample_n(trunc(nrow(df)*.55)), prop = 0.75)
     fco2_train <- training(fco2_initial_split)
 
     hist_fco2 <- fco2_train  %>%
@@ -187,8 +187,8 @@ for(i in seq_along(locais)){
 
     grid_rf <- grid_random(
       min_n(range = c(20, 30)),
-      mtry(range = c(5, 20)),
-      trees(range = c(100, 300) ),
+      mtry(range = c(5, 10)),
+      trees(range = c(100, 500) ),
       size = 20
     )
     fco2_rf_tune_grid <- tune_grid(
@@ -218,7 +218,7 @@ for(i in seq_along(locais)){
     
     fco2_modelo_final <- fco2_rf_wf %>% fit(df)
     saveRDS(fco2_modelo_final, 
-            paste0("models/fco2_modelo_",lo,"_",di,".rds"))
+            paste0("models-2/fco2_modelo_",lo,"_",di,".rds"))
 
     fco2_rf_last_fit_model <- fco2_rf_last_fit$.workflow[[1]]$fit$fit
     vip_plot <- vip(fco2_rf_last_fit_model,
