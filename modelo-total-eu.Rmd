@@ -89,7 +89,7 @@ glimpse(data_eu)
 ```{r}
 # Definindo a base de treino e a base de teste
 df <- data_eu
-fco2_initial_split <- initial_split(df  %>%                                          select(-c(id,ano,mes,dia,data)) %>%                                           sample_n(trunc(nrow(df)*.005)), prop = 0.75)
+fco2_initial_split <- initial_split(df  %>%                                          select(-c(id,ano,mes,dia,data)) %>%                                           sample_n(trunc(nrow(df)*.75)), prop = 0.75)
 fco2_train <- training(fco2_initial_split)
 
 hist_fco2 <- fco2_train  %>%
