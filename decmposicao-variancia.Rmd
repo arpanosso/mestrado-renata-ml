@@ -1,0 +1,125 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+Vamos definir:
+
+$y = f(x)$ é o nosso alvo
+
+$\hat{y} = \hat{f}(x)$ valor predito
+
+$S = (y - \hat{y})^2$ erro quadrático
+
+Referêcia
+
+$Bias[\hat{\theta}]-\theta$
+
+$Var[\hat{\theta}] = E[\hat{\theta}^2]-(E[\hat{\theta}])^2$
+
+$Var[\hat{\theta}] = E\left[ \left(E[\hat{\theta}]-\hat{\theta}\right)^2 \right]$
+
+## Viés-Variância do erro quadrático
+
+$$
+S = (y - \hat{y})^2 
+$$
+lembrando
+
+
+$$
+\begin{aligned}
+(a-b)^2 &= (a^2 - 2ab - b^2) \\
+
+ &= a^2 + b^2 - 2 ab
+\end{aligned}
+$$
+
+Agora vamos utilizar um pequeno truque aqui, vamos somar e subtrair o mesmo termo, temos:
+
+$$
+\begin{aligned}
+S &= (y - \hat{y})^2 \\
+&= (y - \hat{y})^2 = (y - E[\hat{y}] + E[\hat{y}] - \hat{y})^2
+\end{aligned}
+$$
+
+Observe que $- E[\hat{y}] + E[\hat{y}] = 0$
+
+$$
+\begin{aligned}
+S &= (y - \hat{y})^2 \\
+&= (y - \hat{y})^2 = (y - E[\hat{y}])^2+(E[\hat{y}] - \hat{y})^2 -2(y - E[\hat{y}])(E[\hat{y}] - \hat{y})
+\end{aligned}
+$$
+
+Então podemos aplicar a esperança aos dois lados da igualdade abaixo
+
+$$
+(y - \hat{y})^2 =  (y - E[\hat{y}])^2+(E[\hat{y}] - \hat{y})^2 -2(y - E[\hat{y}])(E[\hat{y}] - \hat{y})
+$$
+
+
+e teremos
+
+$$
+E\left[ (y - \hat{y})^2 \right] =  E\left[ (y - E[\hat{y}])^2+(E[\hat{y}] - \hat{y})^2 -2(y - E[\hat{y}])(E[\hat{y}] - \hat{y}) \right]
+$$
+
+$$
+E\left[ (y - \hat{y})^2 \right] =  E\left[ (y - E[\hat{y}])^2 \right] + E\left[ (E[\hat{y}] - \hat{y})^2 \right] - E\left[2(y - E[\hat{y}])(E[\hat{y}] - \hat{y}) \right]
+$$
+Vamos analisar o lado direito da igualdade:
+
+i) O termo $E\left[ (y - E[\hat{y}])^2 \right]$
+
+
+Temos que:
+
+$$
+E\left[ (y - E[\hat{y}])^2 \right] = (y - E[\hat{y}])^2 
+$$
+no termo acima temos que $y$ é uma constante e $E[\hat{y}]$  já temos essa valor, essa média prevista aqui, então, nada muda na verdade. Esta vendo a diferença de uma constante e uma predição média, e se nós tirarmos o valor esperado dela, nada deverá mudar pois só estamos subtraindo o mesmo valor do mesmo valor várias vezes, então o termo parmanece o mesmo.
+
+
+ii) O termo $E\left[ (E[\hat{y}] - \hat{y})^2 \right]$
+
+temos o valor de variância, ou seja, a quão distante uma predição específica está da predição média. Ou seja, o quanto ela varia ao quadrado. Então,levando em consideração as expectativas ou quão distantes estão as previsões individuais para cada conjunto de treinamento, essencialmente, em relação à previsão média. Isso seria o nosso termo de variância. Portanto
+
+
+$$
+E\left[ (E[\hat{y}] - \hat{y})^2 \right] = Var[\hat{y}]
+$$
+
+
+iii) O termo $E\left[2(y - E[\hat{y}])(E[\hat{y}] - \hat{y}) \right]$
+
+Temos que:
+
+$$
+\begin{aligned}
+E\left[2(y - E[\hat{y}])(E[\hat{y}] - \hat{y}) \right] &= 2E\left[(y - E[\hat{y}])(E[\hat{y}] - \hat{y}) \right] \\
+&= 2E\left[(y - E[\hat{y}]) \right] \cdot E\left[(E[\hat{y}] - \hat{y}) \right] \\
+&= 2 (y - E[\hat{y}]) \cdot (E[E[\hat{y}]] - E[\hat{y}]) \\
+&= 2 (y - E[\hat{y}]) \cdot (E[\hat{y}] - E[\hat{y}]) \\
+&= 2 (y - E[\hat{y}]) \cdot (0) \\
+&= 0
+\end{aligned}
+$$
+
+
+
+
+Finalmente temos
+
+
+$$
+E[S] = E \left[ (y - \hat{y})^2 \right] \\
+
+E \left[ (y - \hat{y})^2 \right] = (y - E[\hat{y}])^2 + E \left[(E[\hat{y}]-\hat{y})^2 \right] \\
+E\left[ (y - \hat{y})^2 \right] =  \text{Viés}^2+\text{Variância}
+$$
+
+
+
+
