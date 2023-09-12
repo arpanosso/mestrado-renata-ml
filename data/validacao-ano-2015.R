@@ -42,7 +42,7 @@ data_set <- left_join(temporal, spatial, by="id") %>%
   relocate(id,data)
 
 
-file_models <- list.files("models", pattern = "EU")
+file_models <- list.files("models-2", pattern = "EU")
 
 fco2_modelo_load <- read_rds(paste0("models/",file_models[1]))
 df <- predict(fco2_modelo_load, new_data = data_set %>%
@@ -75,7 +75,7 @@ dias <- data_set %>%  pull(data) %>% unique()
 dis <- 100/93
 grid <- expand.grid(Y=seq(0,100,dis), X=seq(0,100,dis))
 dados_reais <- readxl::read_xlsx("data/dados-originais.xlsx")
-
+file_models_total <- rep("fco2-modelo-total-eu.rds",5)
 
 for(i in seq_along(dias)){
   print(i)
@@ -83,14 +83,18 @@ for(i in seq_along(dias)){
     filter(data == dias[i])
   preds <- data.frame(Fobs = df$F)
   for(j in seq_along(file_models)){
-    fco2_modelo_load <- read_rds(paste0("models/",file_models[j]))
+    fco2_modelo_load <- read_rds(paste0("models-2/",file_models[j]))
+    #fco2_modelo_load <- read_rds(file_models_total[j])
     pred <- predict(fco2_modelo_load, new_data = df) %>% as.vector()
     preds <- cbind(preds,pred)
   }
   preds$media_models <- apply(preds[,2:6],1,median)
 
-  plot_obs_vs_pred<-preds  %>% select(Fobs,media_models) %>%
-    ggplot(aes(x=media_models, y=Fobs)) +
+  names(preds) <- c("Fobs","model1","model2","model3",
+                    "model4","model5","media_models")
+
+  plot_obs_vs_pred<-preds  %>% select(Fobs,model1) %>%
+    ggplot(aes(x=model1, y=Fobs)) +
     geom_point()+
     theme_bw() +
     geom_smooth(method = "lm") +
@@ -109,9 +113,6 @@ for(i in seq_along(dias)){
     geom_tile(aes(fill = media_models)) +
     scale_fill_viridis_c() +
     coord_equal()
-
-  names(preds) <- c("Fobs","model1","model2","model3",
-                    "model4","model5","media_models")
 
   mp_model1 <- tibble(grid, preds) %>%
     ggplot(aes(x=X,y=Y)) +
@@ -175,5 +176,6 @@ for(i in seq_along(dias)){
        label =  paste(..eq.label.., ..rr.label.., sep = "*plain(\",\")~~")))
   print(graf_final)
 }
+# models-2 o modelo 01 deu bom desempenho
 
 
