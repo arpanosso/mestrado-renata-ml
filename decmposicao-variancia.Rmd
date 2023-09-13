@@ -126,12 +126,14 @@ $$E\left[ (y - \hat{y})^2 \right] =  \text{Viés}^2+\text{Variância}$$
 library(tidyverse)
 x <- seq(1,10)
 set.seed(4)
-y <- c(2.8,3.3,3.4,3.2,2.9,2.8,2.95,3.2,4,5.4) +rnorm(10,0,.3)
+y <- c(2.8,3.3,3.4,3.2,2.9,2.8,2.95,3.2,4,4.4) +rnorm(10,0,.3)
 x2 <- seq(1,10,.25)
 y2 <- 0.0224067599067599*x2^3 -0.309294871794872*x2^2 + 1.20087412587413*x2^1 + 1.91999 +rnorm(length(x2),0,.1)
+df <- tibble(x2,y2)
+vl <- c(2,4,6,10,14,18,22,26,28,30,31,33,34:36)
 tibble(x,y) %>% 
   ggplot(aes(x,y)) +
-  geom_point(size=3) +
+  geom_point(size=4) +
   theme_bw() +
   ylim(0,6) + xlim(0,11) +
   stat_smooth(method="lm", se=FALSE, fill=NA,
@@ -140,10 +142,24 @@ tibble(x,y) %>%
                 formula=y ~ poly(x, 2, raw=TRUE),colour="red",lwd=.1) +
   stat_smooth(method="lm", se=FALSE, fill=NA,
                 formula=y ~ poly(x,8, raw=TRUE),colour="black",lwd=.1) +
-  geom_point(data =tibble(x2,y2) %>% 
-               sample_n(20), aes(x=x2,y=y2),
-             shape=1,color="red",size=3)
-
+  geom_point(data =df[vl,], aes(x=x2,y=y2),
+             shape=1,color="red",size=5)
 ```
 
+```{r}
+error2 <- c(.38,.13,0.025,.026,.03,.03,.03,.03,.2,.38)
+error1 <- c(.39,.16,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02)
+grau <-rep(1:10,2)
+erro <- c(error1,error2)
+tipo <- rep(c("treinamento","teste"),c(10,10))
+tibble(grau,erro,tipo) %>% 
+  ggplot(aes(grau,erro,group=tipo)) +
+  geom_point(aes(shape=tipo,color=tipo),size=3) +
+  scale_shape_manual(values=c(4, 1)) +
+  scale_color_manual(values=c("blue","red" )) +
+  geom_line(aes(color=tipo)) +
+  scale_color_manual(values=c("blue","red" )) +
+  theme_bw()
+  
+```
 
