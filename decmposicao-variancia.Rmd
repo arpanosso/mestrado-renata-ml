@@ -141,9 +141,13 @@ tibble(x,y) %>%
   stat_smooth(method="lm", se=FALSE, fill=NA,
                 formula=y ~ poly(x, 2, raw=TRUE),colour="red",lwd=.1) +
   stat_smooth(method="lm", se=FALSE, fill=NA,
-                formula=y ~ poly(x,8, raw=TRUE),colour="black",lwd=.1) +
+                formula=y ~ poly(x,10, raw=TRUE),colour="black",lwd=.1) +
+    stat_smooth(method="lm", se=FALSE, fill=NA,
+                formula=y ~ poly(x,1, raw=TRUE),colour="orange",lwd=.5) +
   geom_point(data =df[vl,], aes(x=x2,y=y2),
-             shape=1,color="red",size=5)
+             shape=1,color="red",size=5)+
+  coord_cartesian(ylim=c(1.8,5.2)) +
+  labs(x="Preditora", y="Alvo")
 ```
 
 ```{r}
@@ -159,7 +163,9 @@ tibble(grau,erro,tipo) %>%
   scale_color_manual(values=c("blue","red" )) +
   geom_line(aes(color=tipo)) +
   scale_color_manual(values=c("blue","red" )) +
-  theme_bw()
+  theme_bw() +
+  labs(x= "Grau", y="Erro quadrático médio (MSE)", color="", shape="")+
+  theme(legend.position = "top") + scale_x_continuous(breaks = c(2,4,6,8,10))
   
 ```
 
